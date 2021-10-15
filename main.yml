@@ -1,0 +1,43 @@
+---
+- name: Create an Nginx webserver
+  hosts: localhost
+  gather_facts: no
+  become: true
+
+  tasks:     
+   - name: creating a docker repo
+     yum_repository:
+        description: repository for docker
+        name: docker-ce
+        baseurl: https://download.docker.com/linux/centos/7/x86_64/stable/
+        gpgcheck: no
+     become: yes
+
+   - name: installing docker if not present
+     package:
+          name: docker-ce
+          state: present
+     become: yes
+
+   - name: starting the docker service
+     service:
+        name: docker
+        state: started
+
+   - name: installing docker sdk using pip3
+     command: pip install docker
+     become: yes
+     
+
+   - name: creating the nginx container & mount via the created pv 
+     docker_container:
+      name: web_server
+      image: nginx:latest
+      volumes:
+        - /mnt/www:/var/www/html
+      ports:
+        - 8080:8080
+
+   - name:  Checks with curl if nginx welcome page can be reached
+     uri:
+      url: localhost:8080
