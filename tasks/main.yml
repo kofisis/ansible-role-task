@@ -1,0 +1,74 @@
+---
+- name: Create an Nginx webserver
+  hosts: localhost
+  gather_facts: no
+  become: true
+
+  tasks:     
+   
+   # python_version is a given variable, eg. `3.5`
+   - name: Check if python is already latest
+     command: python3 --version
+     register: python_version_result
+     failed_when: "{{ python_version_result.stdout | replace('Python ', '') | version_compare(python_version, '>=') }}"
+
+   - name: Install prerequisites
+     yum: name=python-software-properties state=present
+     become: true
+
+   - name: Add deadsnakes repo
+     yum_repository: repo="ppa:deadsnakes/ppa"
+     become: true
+
+   - name: Install python
+     yum: name="python{{ python_version }}-dev" state=present
+     become: true
+
+   - name: creating a docker repo
+     yum_repository:
+        description: repository for docker
+        name: docker-ce
+        baseurl: https://download.docker.com/linux/centos/7/x86_64/stable/
+        gpgcheck: no
+     become: yes
+
+   - name: installing docker if not present
+     package:
+          name: docker-ce
+          state: present
+     become: yes
+
+   - name: starting the docker service
+     service:
+        name: docker
+        state: started
+
+   - name: installing pip modules & pip cmd if not available
+     yum:
+      name:
+        - epel-release
+        - python-pip  
+      state: present
+
+
+   - name: installing docker sdk using pip3
+     command: pip install docker
+     become: yes
+     
+   - name: create a directory to mount nginx website  
+     file:
+      path: /mnt/www
+      state: directory
+
+   - name: creating the nginx container & mount via the created pv 
+     docker_container:
+      name: web_server
+      image: nginx:latest
+      volumes:
+        - /mnt/www:/var/www/html
+      ports:
+        - 8080:8080
+
+   - name:  Checks with curl if nginx welcome page can be reached
+     uri:
+      url: localhost:8080
